@@ -68,8 +68,8 @@
 
 	<!-- Connection to peers in network of brokers -->
 	<networkConnectors>
-        <networkConnector name="siteb" uri="static:(${NETWORKOFBROKERSTEST_SITEA_1_PORT_61616_TCP})" />
-        <networkConnector name="sitea" uri="static:(${NETWORKOFBROKERSTEST_SITEB_1_PORT_61616_TCP})" />
+        <networkConnector name="siteb" uri="${SITEB_NETWORK_CONNECTOR}" />
+        <networkConnector name="sitea" uri="${SITEA_NETWORK_CONNECTOR}" />
     </networkConnectors>
 
 	<!-- The transport connectors ActiveMQ will listen to -->

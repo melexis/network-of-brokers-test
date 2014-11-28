@@ -67,9 +67,9 @@
 	</managementContext>
 
 	<!-- Connection to peers in network of brokers -->
-	<networkConnectors>
-        <networkConnector name="siteb" uri="static:(${NETWORKOFBROKERSTEST_SITEB_1_PORT_61616_TCP})" />
-        <networkConnector name="sitec" uri="static:(${NETWORKOFBROKERSTEST_SITEC_1_PORT_61616_TCP})" />
+    <networkConnectors>
+        <networkConnector name="siteb" uri="${SITEB_NETWORK_CONNECTOR}" />
+        <networkConnector name="sitec" uri="${SITEC_NETWORK_CONNECTOR}" />
     </networkConnectors>
 
 	<!-- The transport connectors ActiveMQ will listen to -->
