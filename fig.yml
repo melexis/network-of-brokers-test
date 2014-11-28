@@ -1,7 +1,7 @@
 sitea:
     build: site-a
     ports: 
-    - "6000:61616"
+    - "7000:61616"
     links:
     - siteb
     - sitec
@@ -11,14 +11,14 @@ sitea:
 siteb:
     build: site-b
     ports: 
-    - "6001:61616"
+    - "7001:61616"
     environment:
     - SITEA_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEA_1_PORT_61616_TCP))
     - SITEC_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEC_1_PORT_61616_TCP))
 sitec:
     build: site-c
     ports: 
-    - "6002:61616"
+    - "7002:61616"
     environment:
     - SITEA_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEA_1_PORT_61616_TCP))
     - SITEB_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEB_1_PORT_61616_TCP))
