@@ -1,0 +1,15 @@
+sitea:
+    build: site-a
+    ports: 
+    - "6000:61616"
+    links:
+    - siteb
+    - sitec
+siteb:
+    build: site-b
+    ports: 
+    - "6001:61616"
+sitec:
+    build: site-c
+    ports: 
+    - "6002:61616"
