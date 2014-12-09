@@ -58,3 +58,11 @@
   (let [destination (.createTopic session destination-name)
         consumer (.createConsumer session destination)]
     (.receive consumer timeout)))
+
+(defn subscribe [session topic on-message-cb]
+  (let [destination (.createTopic session topic)
+        consumer (.createConsumer session destination)]
+    (.setMessageListener consumer
+                         (reify 
+                           javax.jms.MessageListener
+                           (onMessage [_ msg] (on-message-cb msg))))))
