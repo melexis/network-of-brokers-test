@@ -35,7 +35,7 @@
 
 (defmethod send :topic
   [session destination-name msg _]
-  (let [destination (.createTopic destination-name)
+  (let [destination (.createTopic session destination-name)
         producer (.createProducer session destination)]
     (.send producer msg)))
 
