@@ -24,7 +24,8 @@
 
 (defn ^:private listener-thread
   [uri messages-agent]
-  (let [kill-chan (chan 1)]
+  (let [kill-chan (chan 1)
+        init-chan (chan 1)]
     (.start
      (Thread. 
       (fn []
@@ -32,11 +33,19 @@
         (a/with-connection c uri
           (a/with-session s c false :auto_acknowledge
             (a/subscribe s "topic" 
-                         (fn [msg] (send messages-agent conj msg)))
+                         (fn [msg] 
+                           (send messages-agent conj msg)))
+
+                                        ; Signal that the listener is ready
+            (close! init-chan)
 
             ; Block till the chan is quit
             (while (not (nil? (<!! kill-chan)))
               (Thread/sleep 100)))))))
+    
+    ; Block till initialization is ready
+    (<!! init-chan)
+    
     kill-chan))
 
 (defn send-to-multiple-brokers
@@ -56,10 +65,9 @@
               (println "Sending to uri" uri)            
               (a/with-connection c uri
                 (a/with-session s c false :auto_acknowledge
-                  (let [msg (a/create-message s (str (int n)))]
+                  (let [msg (a/create-message s (str (int i)))]
 
-                    (a/send s "topic" msg :topic)
-                    (Thread/sleep 10))))))
+                    (a/send s "topic" msg :topic))))))
           (doall))
 
                                         ; Verify that all listeners got the same amount of messages
@@ -68,7 +76,9 @@
          
          (println "After" n "seconds:")
          (-> (for [[uri msgs] uri-messages]
-               (println "Uri" uri "messages" (count @msgs)))
+               (do
+                 (println "Uri" uri "messages" (count @msgs))
+                 (println (map #(.getText %) @msgs))))
              (doall))
 
          (if (not (every? (fn [[_ msgs]] (= amount (count @msgs)))
