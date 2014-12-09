@@ -12,6 +12,8 @@ siteb:
     build: site-b
     ports: 
     - "7001:61616"
+    links:
+    - sitec
     environment:
     - SITEA_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEA_1_PORT_61616_TCP))
     - SITEC_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEC_1_PORT_61616_TCP))
