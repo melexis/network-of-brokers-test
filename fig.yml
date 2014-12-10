@@ -1,26 +1,23 @@
 sitea:
     build: site-a
+    hostname: site-a
     ports: 
     - "7000:61616"
-    links:
-    - siteb
-    - sitec
-    environment:
-    - SITEB_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEB_1_PORT_61616_TCP))
-    - SITEC_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEC_1_PORT_61616_TCP))
 siteb:
     build: site-b
+    hostname: site-b
     ports: 
     - "7001:61616"
-    links:
-    - sitec
-    environment:
-    - SITEA_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEA_1_PORT_61616_TCP))
-    - SITEC_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEC_1_PORT_61616_TCP))
 sitec:
     build: site-c
+    hostname: site-c
     ports: 
     - "7002:61616"
-    environment:
-    - SITEA_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEA_1_PORT_61616_TCP))
-    - SITEB_NETWORK_CONNECTOR=static:($NETWORKOFBROKERSTEST_SITEB_1_PORT_61616_TCP))
+etcd:
+    image: quay.io/coreos/etcd
+    ports:
+    - "4001:4001"
+    links:
+    - sitea
+    - siteb
+    - sitec
