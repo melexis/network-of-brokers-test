@@ -8,20 +8,22 @@ sleep 5
 
 IP=`hostname  -I | cut -f1 -d' '`
 HOSTNAME=`hostname`
-URL="http://172.17.42.1:4001/v2/keys/ip/$HOSTNAME"
+URI_URL="http://172.17.42.1:4001/v2/keys/uri/$HOSTNAME"
+IP_URL="http://172.17.42.1:4001/v2/keys/ip/$HOSTNAME"
 ADDRESS="static:(tcp://$IP:61616)"
 
 echo "Using etcd url $URL"
 echo "Setting $URL to to $ADDRESS"
-curl -XPUT $URL -d value="$ADDRESS"
+curl -XPUT $URI_URL -d value="$ADDRESS"
+curl -XPUT $IP_URL -d value="$IP"
 
 sleep 2
 
 echo "SITEA: `curl http://172.17.42.1:4001/v2/keys/ip/site-a` SITEB: `curl http://172.17.42.1:4001/v2/keys/ip/site-b` SITEC: `curl http://172.17.42.1:4001/v2/keys/ip/site-c`"
 
-SITEA_NETWORK_CONNECTOR=`curl http://172.17.42.1:4001/v2/keys/ip/site-a | perl -ne 'if (/.*"value":"([()\w\d.:\/]+)".*/) {print $1}'`
-SITEB_NETWORK_CONNECTOR=`curl http://172.17.42.1:4001/v2/keys/ip/site-b | perl -ne 'if (/.*"value":"([()\w\d.:\/]+)".*/) {print $1}'`
-SITEC_NETWORK_CONNECTOR=`curl http://172.17.42.1:4001/v2/keys/ip/site-c | perl -ne 'if (/.*"value":"([()\w\d.:\/]+)".*/) {print $1}'`
+SITEA_NETWORK_CONNECTOR=`curl http://172.17.42.1:4001/v2/keys/uri/site-a | perl -ne 'if (/.*"value":"([()\w\d.:\/]+)".*/) {print $1}'`
+SITEB_NETWORK_CONNECTOR=`curl http://172.17.42.1:4001/v2/keys/uri/site-b | perl -ne 'if (/.*"value":"([()\w\d.:\/]+)".*/) {print $1}'`
+SITEC_NETWORK_CONNECTOR=`curl http://172.17.42.1:4001/v2/keys/uri/site-c | perl -ne 'if (/.*"value":"([()\w\d.:\/]+)".*/) {print $1}'`
 
 echo "Setting SITEA_NETWORK_CONNECTOR to $SITEA_NETWORK_CONNECTOR"
 echo "Setting SITEB_NETWORK_CONNECTOR to $SITEB_NETWORK_CONNECTOR"

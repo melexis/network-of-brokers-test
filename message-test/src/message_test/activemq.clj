@@ -59,7 +59,19 @@
         consumer (.createConsumer session destination)]
     (.receive consumer timeout)))
 
-(defn subscribe [session topic on-message-cb]
+(defmulti subscribe (fn [_ _ _ type] type))
+
+(defmethod subscribe :queue
+  [session queue on-message-cb _]
+  (let [destination (.createQueue session queue)
+        consumer (.createConsumer session destination)]
+    (.setMessageListener consumer
+                         (reify
+                           javax.jms.MessageListener
+                           (onMessage [_ msg] (on-message-cb msg))))))
+
+(defmethod subscribe :topic
+  [session topic on-message-cb _]
   (let [destination (.createTopic session topic)
         consumer (.createConsumer session destination)]
     (.setMessageListener consumer

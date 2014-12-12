@@ -7,4 +7,5 @@
                  [org.apache.activemq/activemq-core "5.5.1"]
                  [org.slf4j/slf4j-api "1.5.11"]
                  [org.slf4j/slf4j-simple "1.5.11"]
-                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]])
+                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
+                 [etcd-clojure "0.2.1"]])

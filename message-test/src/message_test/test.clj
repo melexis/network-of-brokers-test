@@ -1,6 +1,8 @@
 (ns message-test.test
   (:require [message-test.activemq :as a]
-            [clojure.core.async :refer [<!! chan close!]]))
+            [clojure.core.async :refer [<!! chan close!]]
+            [etcd-clojure.core :as etcd]
+            [message-test.iptables :as iptables]))
 
 (defn same-broker-test
   []
@@ -23,7 +25,7 @@
       (assert (a/receive s "different-broker" 1000 :queue)))))
 
 (defn ^:private listener-thread
-  [uri messages-agent]
+  [uri messages-agent destination destination-type]
   (let [kill-chan (chan 1)
         init-chan (chan 1)]
     (.start
@@ -32,9 +34,11 @@
         (println "Starting listener thread for uri" uri)
         (a/with-connection c uri
           (a/with-session s c false :auto_acknowledge
-            (a/subscribe s "topic" 
-                         (fn [msg] 
-                           (send messages-agent conj msg)))
+            (println "Subscribing to" destination-type destination "on uri" uri)
+            (a/subscribe s 
+                         destination
+                         (fn [msg] (send messages-agent conj msg))
+                         destination-type)
 
                                         ; Signal that the listener is ready
             (close! init-chan)
@@ -48,15 +52,69 @@
     
     kill-chan))
 
+(defn ^:private interruption-thread
+  [max-sleep-time]
+  (let [zipmap* (fn [xs] (zipmap xs (repeat :accept)))
+        endpoints (->> (etcd/list "ip")
+                       (map :value)
+                       (zipmap*)
+                       (atom))
+        kill-chan (chan 1)
+        kill-chans (map (fn [_] (chan 1)) @endpoints)
+        killed-chan (chan 1)
+        continue (atom true)]
+    (doall (map (fn [[ip _] n c]
+                  (.start 
+                   (Thread.
+                    (fn []
+                      (loop [status (get @endpoints ip)]
+                        (println "Endpoint" ip "is now in status" status)
+                        (let [sleep-time (-> (Math/random) (* max-sleep-time) (int))
+                              type (if (= :accept status) :drop :accept)]
+                          (Thread/sleep sleep-time)
+
+                          (println "Setting rule" :forward n :tcp ip "61616" type)
+                          (iptables/set-rule :forward n :tcp ip "61616" type)
+                          (swap! endpoints assoc ip type)
+                          (if @continue
+                            (recur type)
+                            (do
+                                        ; Allow communication again before stopping
+                              (if (= type :drop)
+                                (iptables/set-rule :forward n :tcp ip "61616" :accept))
+                              (close! c)))))))))
+                @endpoints
+                (map (partial inc) (range (count @endpoints)))
+                kill-chans))
+
+    (.start
+     (Thread.
+      (fn []
+
+                                        ; Wait till we're signalled to stop
+        (<!! kill-chan)
+        (reset! continue false)
+
+                                        ; Wait till all threads are stopped
+        (doseq [kc kill-chans] (<!! kc))
+
+                                        ; Singnal that we're completely stopped
+        (close! killed-chan))))
+    [kill-chan killed-chan endpoints]))
+
 (defn send-to-multiple-brokers
   [amount & uris]
   (let [messages (map (fn [_] (agent [])) uris)
         uri-messages (zipmap uris messages)]
 
                                         ; Start a listener for all uris
-    (let [kill-chans (-> (for [[uri messages] uri-messages] 
-                           (listener-thread uri messages))
-                         (doall))]
+    (let [kill-chans (-> (map (fn [[uri messages]]
+                                (let [destination-name (str "Consumer." (.toString (java.util.UUID/randomUUID)) ".VirtualTopic.topic")]
+                                  (listener-thread uri messages destination-name :queue))) 
+                              uri-messages)                     
+                         (doall))
+                                        ; Start the interruption threads that will randomly drop messages
+          [interruption-kill-chan interruption-killed-chan interruption-endpoints] (interruption-thread 20000)]
 
                                         ; Send the requested amount of messages
       (-> (for [i (range amount)]
@@ -68,8 +126,13 @@
                 (a/with-session s c false :auto_acknowledge
                   (let [msg (a/create-message s (str (int i)))]
                     (println "Sending message" i "to uri" uri)
-                    (a/send s "topic" msg :topic))))))
+                    (a/send s "VirtualTopic.topic" msg :topic))))))
           (doall))
+
+                                        ; Sending is completed,  signal the interruption thread to stop
+      (close! interruption-kill-chan)
+      (println "Waiting for the interruption kill chan to stop")
+      (<!! interruption-killed-chan)
 
                                         ; Verify that all listeners got the same amount of messages
       (doall 
@@ -79,7 +142,14 @@
          (-> (for [[uri msgs] uri-messages]
                (do
                  (println "Uri" uri "messages" (count @msgs))
-                 (println (map #(.getText %) @msgs))))
+                 (println "Endpoints:" @interruption-endpoints)
+                 (println "Duplicates:" (->> @msgs
+                                             (group-by identity)
+                                             (filter #(> (count (second %)) 1))
+                                             (map first)))
+                 
+                 ;(println (map #(.getText %) @msgs))
+                 ))
              (doall))
 
          (if (not (every? (fn [[_ msgs]] (= amount (count @msgs)))
