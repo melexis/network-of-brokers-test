@@ -122,7 +122,6 @@
      (-> (for [[uri msgs] uri-messages]
            (do
              (println "Uri" uri "messages" (count @msgs))
-;             (println "Endpoints:" @interruption-endpoints)
              (println "Duplicates:" (->> @msgs
                                          (group-by identity)
                                          (filter #(> (count (second %)) 1))
@@ -165,8 +164,6 @@
       (->> kill-chans
            (map (fn [c] (close! c)))
            (doall)))))
-
-
 
 (defn test-servers-test []
   (send-to-multiple-brokers 10 {:interrupt? false} "failover:(tcp://esb-a-test.sensors.elex.be:61602,tcp://esb-b-test.sensors.elex.be:61602)" "failover:(tcp://esb-a-test.sofia.elex.be:61602,tcp://esb-b-test.sofia.elex.be:61602)" "failover:(tcp://esb-a-test.erfurt.elex.be:61602,tcp://esb-b-test.erfurt.elex.be:61602)" "failover:(tcp://esb-a-test.colo.elex.be:61602,tcp://esb-b-test.colo.elex.be:61602)" "failover:(tcp://esb-a-test.kuching.elex.be:61602,tcp://esb-b-test.kuching.elex.be:61602)"))
