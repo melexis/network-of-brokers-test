@@ -1,4 +1,5 @@
 (ns message-test.activemq
+  (:refer-clojure :exclude [send])
   (:import org.apache.activemq.ActiveMQConnectionFactory
            javax.jms.Session))
 
