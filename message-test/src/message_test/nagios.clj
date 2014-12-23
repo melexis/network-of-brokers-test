@@ -34,8 +34,8 @@
       result)))
 
 (defn -main
-  [& uris]
-  (if (run uris)
+  [timeout & uris]
+  (if (run uris (Integer/parseInt timeout))
     ; the test was successful
     (System/exit 0)
     (System/exit 1)))
