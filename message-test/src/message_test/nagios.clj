@@ -1,7 +1,8 @@
 (ns message-test.nagios
   (:require [message-test.message :refer [attach-agent-to-uris listen-for-messages send-messages]]
             [clj-time.core :refer [now plus millis after?]]
-            [clojure.core.async :refer [close!]]))
+            [clojure.core.async :refer [close!]])
+  (:gen-class))
 
 (defn all-complete?
   [agents]
