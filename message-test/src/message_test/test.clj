@@ -76,27 +76,8 @@
         (close! killed-chan))))
     [kill-chan killed-chan endpoints]))
 
-(defn receive-messages [amount uri-messages timeout]
-  (let [start (clj-time.core/now)]
-  (let [messages (map (fn [_] (agent [])) uris)
-        uri-messages (zipmap uris messages)]
 
-                                        ; Start a listener for all uris
-    (let [kill-chans (-> (map (fn [[uri messages]]
-                                (let [destination-name (str "Consumer." (.toString (java.util.UUID/randomUUID)) ".VirtualTopic.topic")]
-                                  (listener-thread uri messages destination-name :queue))) 
-                              uri-messages)                     
-                         (doall))
-                                        ; Start the interruption threads that will randomly drop messages
-          [interruption-kill-chan interruption-killed-chan interruption-endpoints] (interruption-thread 20000)]
-
-                  ;uri (nth uris 2)
-                  ]
-      (close! interruption-kill-chan)
-      (println "Waiting for the interruption kill chan to stop")
-      (<!! interruption-killed-chan)
-
-                                        ; Verify that all listeners got the same amount of messages
+(defn ^:private receive-messages [amount uri-messages]
     (doall 
      (loop [n 0]
        (println "After" n "seconds:")
@@ -107,26 +88,15 @@
                                            (group-by identity)
                                            (filter #(> (count (second %)) 1))
                                            (map first)))))
-                 
-                 ;(println (map #(.getText %) @msgs))
-                 ))
            (doall))
 
        (if (not (every? (fn [[_ msgs]] (= amount (count @msgs)))
                         uri-messages))
          (do
            (Thread/sleep 1000)
-           (recur (inc n))))))))
+           (recur (inc n)))))))
 
-  (let [uri-messages (attach-agent-to-uris uris)
-        destination "networkOfBrokersTest"
-        kill-chans (listen-for-messages destination uri-messages)]
-          (send-messages destination amount uris)
-        (doall (send-messages destination amount uris)
-               (receive-messages amount uri-messages)))
-      (->> kill-chans
-           (map (fn [c] (close! c)))
-           (doall))))
+
 
 (defn test-servers [env]
   (let [env* (cond
@@ -139,3 +109,6 @@
                         nodeB (clojure.string/join "." [(str "tcp://esb-b" env*) site "elex" "be:61602"])]
                     (str "failover:(" nodeA "," nodeB ")")))]
     (apply send-to-multiple-brokers 10 {:interrupt? false} brokers)))
+
+
+
