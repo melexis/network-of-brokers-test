@@ -8,4 +8,7 @@
                  [org.slf4j/slf4j-api "1.5.11"]
                  [org.slf4j/slf4j-simple "1.5.11"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
-                 [etcd-clojure "0.2.1"]])
+                 [org.clojure/tools.cli "0.3.1"]
+                 [etcd-clojure "0.2.1"]
+                 [clj-time "0.8.0"]]
+  :main message-test.nagios)

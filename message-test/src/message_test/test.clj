@@ -1,5 +1,6 @@
 (ns message-test.test
   (:require [message-test.activemq :as a]
+            [message-test.message :refer [attach-agent-to-uris listen-for-messages send-messages]]
             [clojure.core.async :refer [<!! chan close!]]
             [etcd-clojure.core :as etcd]
             [message-test.iptables :as iptables]))
@@ -24,33 +25,6 @@
     (a/with-session s c false :auto_acknowledge
       (assert (a/receive s "different-broker" 1000 :queue)))))
 
-(defn ^:private listener-thread
-  [uri messages-agent destination destination-type]
-  (let [kill-chan (chan 1)
-        init-chan (chan 1)]
-    (.start
-     (Thread. 
-      (fn []
-        (println "Starting listener thread for uri" uri)
-        (a/with-connection c uri
-          (a/with-session s c false :auto_acknowledge
-            (println "Subscribing to" destination-type destination "on uri" uri)
-            (a/subscribe s 
-                         destination
-                         (fn [msg] (send messages-agent conj msg))
-                         destination-type)
-
-                                        ; Signal that the listener is ready
-            (close! init-chan)
-
-                                        ; Block till the chan is quit
-            (while (not (nil? (<!! kill-chan)))
-              (Thread/sleep 100)))))))
-    
-                                        ; Block till initialization is ready
-    (<!! init-chan)
-    
-    kill-chan))
 
 (defn ^:private interruption-thread
   [max-sleep-time]
@@ -102,8 +76,8 @@
         (close! killed-chan))))
     [kill-chan killed-chan endpoints]))
 
-(defn send-to-multiple-brokers
-  [amount & uris]
+(defn receive-messages [amount uri-messages timeout]
+  (let [start (clj-time.core/now)]
   (let [messages (map (fn [_] (agent [])) uris)
         uri-messages (zipmap uris messages)]
 
@@ -116,51 +90,52 @@
                                         ; Start the interruption threads that will randomly drop messages
           [interruption-kill-chan interruption-killed-chan interruption-endpoints] (interruption-thread 20000)]
 
-                                        ; Send the requested amount of messages
-      (-> (for [i (range amount)]
-            (let [n (* (count uris) (Math/random))
-                  uri (nth uris n)
                   ;uri (nth uris 2)
                   ]
-              (a/with-connection c uri
-                (a/with-session s c false :auto_acknowledge
-                  (let [msg (a/create-message s (str (int i)))]
-                    (println "Sending message" i "to uri" uri)
-                    (a/send s "VirtualTopic.topic" msg :topic))))))
-          (doall))
-
-                                        ; Sending is completed,  signal the interruption thread to stop
       (close! interruption-kill-chan)
       (println "Waiting for the interruption kill chan to stop")
       (<!! interruption-killed-chan)
 
                                         ; Verify that all listeners got the same amount of messages
-      (doall 
-       (loop [n 0]
-         
-         (println "After" n "seconds:")
-         (-> (for [[uri msgs] uri-messages]
-               (do
-                 (println "Uri" uri "messages" (count @msgs))
-                 (println "Endpoints:" @interruption-endpoints)
-                 (println "Duplicates:" (->> @msgs
-                                             (group-by identity)
-                                             (filter #(> (count (second %)) 1))
-                                             (map first)))
+    (doall 
+     (loop [n 0]
+       (println "After" n "seconds:")
+       (-> (for [[uri msgs] uri-messages]
+             (do
+               (println "Uri" uri "messages" (count @msgs))
+               (println "Duplicates:" (->> @msgs
+                                           (group-by identity)
+                                           (filter #(> (count (second %)) 1))
+                                           (map first)))))
                  
                  ;(println (map #(.getText %) @msgs))
                  ))
-             (doall))
+           (doall))
 
-         (if (not (every? (fn [[_ msgs]] (= amount (count @msgs)))
-                          uri-messages))
-           (do
-             (Thread/sleep 1000)
-             (recur (inc n))))))
+       (if (not (every? (fn [[_ msgs]] (= amount (count @msgs)))
+                        uri-messages))
+         (do
+           (Thread/sleep 1000)
+           (recur (inc n))))))))
 
+  (let [uri-messages (attach-agent-to-uris uris)
+        destination "networkOfBrokersTest"
+        kill-chans (listen-for-messages destination uri-messages)]
+          (send-messages destination amount uris)
+        (doall (send-messages destination amount uris)
+               (receive-messages amount uri-messages)))
       (->> kill-chans
            (map (fn [c] (close! c)))
-           (doall)))))
+           (doall))))
 
-(defn test-servers-test []
-  (send-to-multiple-brokers 10 "failover:(tcp://esb-a-test.sensors.elex.be:61602,tcp://esb-b-test.sensors.elex.be:61602)" "failover:(tcp://esb-a-test.sofia.elex.be:61602,tcp://esb-b-test.sofia.elex.be:61602)" "failover:(tcp://esb-a-test.erfurt.elex.be:61602,tcp://esb-b-test.erfurt.elex.be:61602)" "failover:(tcp://esb-a-test.colo.elex.be:61602,tcp://esb-b-test.colo.elex.be:61602)" "failover:(tcp://esb-a-test.kuching.elex.be:61602,tcp://esb-b-test.kuching.elex.be:61602)"))
+(defn test-servers [env]
+  (let [env* (cond
+              (= env "test") "-test"
+              (= env "uat") "-uat"
+              (= env "prod") ""
+              :default (throw (Exception. "Invalid environment")))
+        brokers (for [site ["sensors" "sofia" "erfurt" "colo" "kuching"]]
+                  (let [nodeA (clojure.string/join "." [(str "tcp://esb-a" env*) site "elex" "be:61602"])
+                        nodeB (clojure.string/join "." [(str "tcp://esb-b" env*) site "elex" "be:61602"])]
+                    (str "failover:(" nodeA "," nodeB ")")))]
+    (apply send-to-multiple-brokers 10 {:interrupt? false} brokers)))
