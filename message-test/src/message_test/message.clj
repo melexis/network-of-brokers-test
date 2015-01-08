@@ -45,13 +45,18 @@
 
 (defn send-messages [destination amount uris]
                                         ; Send the requested amount of messages
-  (-> (for [i (range amount)]
-        (let [n (* (count uris) (Math/random))
-              uri (nth uris n)]
-          (a/with-connection c uri
-            (a/with-session s c false :auto_acknowledge
-              (let [msg (a/create-message s (str (int i)))]
-                (println "Sending message" i "to uri" uri)
-                (a/send s destination msg :topic))))))
-      (doall)))
+  (try 
+    (-> (for [i (range amount)]
+          (let [n (* (count uris) (Math/random))
+                uri (nth uris n)]
+            (a/with-connection c uri
+              (a/with-session s c false :auto_acknowledge
+                (let [msg (a/create-message s (str (int i)))]
+                  (println "Sending message" i "to uri" uri)
+                  (a/send s destination msg :topic))))))
+        (doall))
+    (catch Exception e
+      (println "Exception " e)
+      (System/exit 2))))
+
 
